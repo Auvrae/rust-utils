@@ -121,7 +121,7 @@ pub fn create_uuidv7(as_string: bool) -> UUIDv7 {
         .take(6)
         .read(&mut uuid_epoch)
         .unwrap();
-    uuid_epoch.reverse(); // We want BigEndianness
+    uuid_epoch.reverse();
     let mut uuid: [u8; 16] = [0; 16];
     let mut uuid_random: [u8; 8] = [0; 8];
     thread_rng().fill_bytes(&mut uuid_random);
@@ -140,7 +140,6 @@ pub fn create_uuidv7(as_string: bool) -> UUIDv7 {
         for byte in uuid {
             uuid_string += &format!("{:02x}", byte).to_string();
         };
-        //if idx == 9 || idx == 14 || idx == 19 || idx == 24
         uuid_string.insert(8, '-');
         uuid_string.insert(13, '-');
         uuid_string.insert(18, '-');
