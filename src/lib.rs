@@ -1,3 +1,11 @@
+pub fn get_random_buffer(length: u32) -> Vec<u8> {
+    let mut rand_vec: Vec<u8> = vec![];
+    for _ in 0..length {
+        use rand::*;
+        rand_vec.push(rand::thread_rng().gen::<u8>());
+    }
+    rand_vec
+}
 
 pub fn insert_utf8_char(string: &str, idx: usize, c: char) -> String {
     let mut chars = string.chars().into_iter().collect::<Vec<char>>();
@@ -85,7 +93,7 @@ pub fn create_uuidv4() -> String {
         if index == 9 || index == 14 || index == 19 || index == 24 {
             uuid.push('-');
         } else {
-            let c: char = CHARS[((CHARS.len() as f32 * rand::thread_rng().gen::<f32>()).floor() as u8) as usize];
+            let c: char = CHARS[((CHARS.len() as f32 * thread_rng().gen::<f32>()).floor() as u8) as usize];
             if index == 15 {
                 uuid.push('4');
             } else {
@@ -97,40 +105,57 @@ pub fn create_uuidv4() -> String {
 }
 
 /// Creates a UUIDv7 using the RFC-4122 v7 specification.
-/// UUIDv7 uses the first 48bits of the UNIX-EPOCH in Milliseconds converted to hex.
-pub fn create_uuidv7() -> String {
+/// 
+/// Example String: 0198e3d5-3a51-7906-5ef9-c0608aa9a567
+/// Example Bytes: [01, 98, e3, d5, dd, 59, 74, ef, 3a, 6c, c3, 61, 72, 7b, c0, 74]
+pub fn create_uuidv7(as_string: bool) -> UUIDv7 {
     use rand::*;
     use std::io::Read;
     use std::time;
-    const CHARS: [char; 16] = [
-        'a', 'b', 'c', 'd', 'e', 'f', '0', '1', 
-        '2', '3', '4', '5', '6', '7', '8', '9'
-    ];
-    let mut buffer: [u8; 8] = [0,0,0,0,0,0,0,0];
+    let mut uuid_epoch: [u8; 6] = [0; 6];
     time::SystemTime::now()
         .duration_since(time::UNIX_EPOCH)
         .unwrap()
         .as_millis()
         .to_le_bytes()
-        .take(16)
-        .read(&mut buffer)
+        .take(6)
+        .read(&mut uuid_epoch)
         .unwrap();
-    let mut uuid: String;
-    uuid = format!("0{:x}", u64::from_le_bytes(buffer));
-    uuid.insert(8, '-');
-    for index in 14..=36 {
-        if index == 14 || index == 19 || index == 24 {
-            uuid.push('-');
-        } else {
-            let c: char = CHARS[((CHARS.len() as f32 * rand::thread_rng().gen::<f32>()).floor() as u8) as usize];
-            if index == 15 {
-                uuid.push('7');
-            } else {
-                uuid.push(c);
-            }
-        }
+    uuid_epoch.reverse(); // We want BigEndianness
+    let mut uuid: [u8; 16] = [0; 16];
+    let mut uuid_random: [u8; 8] = [0; 8];
+    thread_rng().fill_bytes(&mut uuid_random);
+    for (idx, epoch_byte) in uuid_epoch.iter().enumerate() {
+        uuid[idx] = *epoch_byte;
+    };
+    for (idx, version_byte) in (0x7000 + thread_rng().gen_range(0..4096) as u16).to_be_bytes().iter().enumerate() {
+        uuid[idx+6] = *version_byte;
+    };
+    for (idx, random_byte) in uuid_random.iter().enumerate() {
+        uuid[idx+8] = *random_byte;
+    };
+
+    if as_string {
+        let mut uuid_string: String = String::new();
+        for byte in uuid {
+            uuid_string += &format!("{:02x}", byte).to_string();
+        };
+        //if idx == 9 || idx == 14 || idx == 19 || idx == 24
+        uuid_string.insert(8, '-');
+        uuid_string.insert(13, '-');
+        uuid_string.insert(18, '-');
+        uuid_string.insert(23, '-');
+
+        return UUIDv7::String(uuid_string)
+    } else {
+        return UUIDv7::Bytes(uuid)
     }
-    return uuid;
+}
+
+#[derive(Debug)]
+pub enum UUIDv7 {
+    String(String),
+    Bytes([u8; 16])
 }
 
 pub fn trim_ascii_whitespace(x: &[u8]) -> &[u8] {
